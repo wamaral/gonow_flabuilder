@@ -1,0 +1,51 @@
+<project name="flabuilder" default="run" basedir=".">
+    <description>
+        Publishes the .fla in Flash 5.0 or 5.5
+        .fla and .swf name are taken from current dir name
+
+        Needs gonow_flabuilder.exe
+        Needs ant-contrib
+    </description>
+
+    <!-- put gonow_flabuilder.exe in your PATH -->
+    <property name="flabuilder" value="gonow_flabuilder.exe"/>
+
+    <!-- needs ant-contrib -->
+    <taskdef resource="net/sf/antcontrib/antlib.xml"/>
+    <propertyregex property="projectName" input="${basedir}" regexp="\\([^\\\s]+)\s?[^\\]*$" select="\1" casesensitive="false"/>
+
+    <target name="run">
+        <!-- build only if .as files in src/ have changed -->
+        <uptodate property="build.notRequired" targetfile="${basedir}/${projectName}.swf">
+            <srcfiles dir="${basedir}/src" includes="**/*.as"/>
+        </uptodate>
+        <antcall target="build"/>
+    </target>
+
+    <target name="build" unless="build.notRequired">
+        <tstamp/>
+        <exec dir="${basedir}" executable="${flabuilder}" failonerror="true">
+            <arg line="'${basedir}/${projectName}.fla'"/>
+        </exec>
+        <!-- wait for swf file become newer than every .as file inside src/ -->
+        <waitfor maxwait="10" maxwaitunit="second" checkevery="500">
+            <and>
+                <uptodate property="compiled" targetfile="${basedir}/${projectName}.swf">
+                    <srcfiles dir="${basedir}/src" includes="**/*.as"/>
+                </uptodate>
+                <!-- check if file size changed -->
+                <scriptcondition language="javascript" value="true">
+                    <![CDATA[
+                    importClass(java.io.File);
+                    var s1 = new File(basedir, projectName + ".swf").length();
+                    // sleep
+                    var i = 0;
+                    while (i < 100000) { i++; }
+                    var s2 = new File(basedir, projectName + ".swf").length();
+                    self.setValue(s1 == s2);
+                    ]]>
+                </scriptcondition>
+            </and>
+        </waitfor>
+    </target>
+</project>
